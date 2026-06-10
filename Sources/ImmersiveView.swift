@@ -67,10 +67,20 @@ struct ImmersiveView: View {
             if model.debugDots {
                 entity = FallbackDotsRenderer.makeEntity(from: cloud)
             } else {
-                let resource = try SplatResourceBuilder.makeResource(from: cloud)
-                entity = Entity()
-                entity.components.set(GaussianSplatComponent(resource))
-                mode = "native"
+                let sorting: GaussianSplatResource.SortingMode = model.sortMode == 1 ? .distance : .depth
+                let projection: GaussianSplatResource.ProjectionMode = model.projMode == 1 ? .tangential : .perspective
+                if model.chunked {
+                    entity = try SplatResourceBuilder.makeChunkedEntity(
+                        from: cloud, grid: model.chunkGrid, sorting: sorting, projection: projection)
+                    mode = "native-chunked(\(entity.children.count))"
+                } else {
+                    let resource = try SplatResourceBuilder.makeResource(from: cloud)
+                    resource.sortingMode = sorting
+                    resource.projectionMode = projection
+                    entity = Entity()
+                    entity.components.set(GaussianSplatComponent(resource))
+                    mode = "native"
+                }
             }
             #endif
             root.children.forEach { $0.removeFromParent() }

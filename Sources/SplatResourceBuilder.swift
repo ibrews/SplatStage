@@ -14,6 +14,59 @@ import CoreGraphics
 /// intelligence/techniques/realitykit-gaussian-splat-api-visionos27.md
 enum SplatResourceBuilder {
 
+    /// ⚠️ Beta-1 culling bug (measured on device 2026-06-10): the renderer culls the
+    /// ENTIRE entity whenever the camera is within ~3× the cloud's bounding radius of
+    /// its center (the 3σ kernel support applied to the whole field). A walk-inside
+    /// scene is therefore invisible as one entity. Fix: split into a spatial grid of
+    /// sub-entities — only the chunk the camera is inside ever culls.
+    @MainActor
+    static func makeChunkedEntity(from cloud: SplatCloud, grid: Int,
+                                  sorting: GaussianSplatResource.SortingMode,
+                                  projection: GaussianSplatResource.ProjectionMode) throws -> Entity {
+        let root = Entity()
+        guard cloud.count > 0 else { return root }
+
+        // bounds of positions
+        var lo = SIMD3<Float>(repeating: .greatestFiniteMagnitude)
+        var hi = SIMD3<Float>(repeating: -.greatestFiniteMagnitude)
+        for i in 0..<cloud.count {
+            let p = SIMD3<Float>(cloud.positions[i*3], cloud.positions[i*3+1], cloud.positions[i*3+2])
+            lo = simd_min(lo, p); hi = simd_max(hi, p)
+        }
+        let span = simd_max(hi - lo, SIMD3<Float>(repeating: 1e-5))
+        let g = Float(grid)
+
+        var cells: [Int: [Int]] = [:]
+        for i in 0..<cloud.count {
+            let p = SIMD3<Float>(cloud.positions[i*3], cloud.positions[i*3+1], cloud.positions[i*3+2])
+            let n = simd_clamp((p - lo) / span * g, SIMD3<Float>(repeating: 0), SIMD3<Float>(repeating: g - 1))
+            let key = (Int(n.x) * grid + Int(n.y)) * grid + Int(n.z)
+            cells[key, default: []].append(i)
+        }
+
+        // Runt cells (<256 splats) produce buffers the renderer mishandles —
+        // fold them into the largest cell (Vitrine device-proven).
+        let minimumChunk = 256
+        let runts = cells.filter { $0.value.count < minimumChunk }.map(\.key)
+        if !runts.isEmpty, let biggest = cells.max(by: { $0.value.count < $1.value.count })?.key {
+            for key in runts where key != biggest {
+                cells[biggest, default: []].append(contentsOf: cells.removeValue(forKey: key) ?? [])
+            }
+        }
+
+        for (_, idx) in cells {
+            // Positions stay in cloud space; chunk entities at identity (Vitrine-proven).
+            let sub = cloud.gathered(idx)
+            let resource = try makeResource(from: sub)
+            resource.sortingMode = sorting
+            resource.projectionMode = projection
+            let e = Entity()
+            e.components.set(GaussianSplatComponent(resource))
+            root.addChild(e)
+        }
+        return root
+    }
+
     @MainActor
     static func makeResource(from cloud: SplatCloud) throws -> GaussianSplatResource {
         // Documented path (WWDC26 §279 + the XROS27 swiftinterface), CONFIRMED by the
@@ -51,7 +104,11 @@ enum SplatResourceBuilder {
     private static func descriptor(_ values: [Float], components: Int,
                                    format: MTLAttributeFormat) throws -> GaussianSplatResource.BufferDescriptor {
         let byteCount = values.count * MemoryLayout<Float>.stride
-        let buffer = try LowLevelBuffer(descriptor: .init(capacity: byteCount))
+        // ⚠️ Beta-1: capacity must be padded to a 256-BYTE multiple. Unpadded throws
+        // ResourceError.invalid(bufferCapacity:); 16-byte padding passes the validator
+        // but renders scattered garbage ("exploded" chunks). 256 is device-proven
+        // (Vitrine). bytesUsed stays exact.
+        let buffer = try LowLevelBuffer(descriptor: .init(capacity: (byteCount + 255) & ~255))
         buffer.withUnsafeMutableBytes { raw in
             values.withUnsafeBytes { src in
                 raw.copyMemory(from: src)

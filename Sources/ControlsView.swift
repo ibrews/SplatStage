@@ -46,6 +46,16 @@ struct ControlsView: View {
                     }
                     #if !targetEnvironment(simulator)
                     Toggle("Debug dots (fallback renderer)", isOn: $model.debugDots)
+                    Toggle("Chunked (3σ-cull workaround)", isOn: $model.chunked)
+                    Picker("Chunk grid", selection: $model.chunkGrid) {
+                        Text("2³").tag(2); Text("4³").tag(4); Text("6³").tag(6); Text("8³").tag(8)
+                    }
+                    Picker("Sorting", selection: $model.sortMode) {
+                        Text("depth").tag(0); Text("distance").tag(1)
+                    }
+                    Picker("Projection", selection: $model.projMode) {
+                        Text("perspective").tag(0); Text("tangential").tag(1)
+                    }
                     #endif
                 }
                 Section("Telemetry") {

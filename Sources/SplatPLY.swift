@@ -9,7 +9,7 @@ struct SplatCloud {
     var count: Int
     var positions: [Float]   // xyz interleaved, 3 per splat
     var logScales: [Float]   // 3 per splat (raw scale_0..2)
-    var rotations: [Float]   // 4 per splat, normalized, stored x,y,z,w (PLY is w,x,y,z)
+    var rotations: [Float]   // 4 per splat, normalized, W-FIRST (w,x,y,z as in PLY)
     var logitOpacities: [Float] // 1 per splat
     var dc: [Float]          // 3 per splat (f_dc_0..2)
 }
@@ -98,16 +98,15 @@ enum SplatPLY {
                 logScales[i * 3 + 0] = f(oS0)
                 logScales[i * 3 + 1] = f(oS1)
                 logScales[i * 3 + 2] = f(oS2)
-                // PLY rot_0..3 is (w,x,y,z), unnormalized. Normalize; store x,y,z,w
-                // (simd storage order). If splat orientations look wrong on real
-                // scenes, the w-position is the first thing to A/B.
-                var q = simd_quatf(ix: f(oR1), iy: f(oR2), iz: f(oR3), r: f(oR0))
-                let len = simd_length(q.vector)
-                if len > 1e-8 { q = simd_quatf(vector: q.vector / len) } else { q = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1) }
-                rotations[i * 4 + 0] = q.vector.x
-                rotations[i * 4 + 1] = q.vector.y
-                rotations[i * 4 + 2] = q.vector.z
-                rotations[i * 4 + 3] = q.vector.w
+                // PLY rot_0..3 is (w,x,y,z), unnormalized. The renderer expects
+                // W-FIRST order as stored in the PLY (Vitrine device-proven) —
+                // do NOT reorder to simd x,y,z,w. Normalize only.
+                var q = SIMD4<Float>(f(oR0), f(oR1), f(oR2), f(oR3))
+                q /= max(simd_length(q), 1e-6)
+                rotations[i * 4 + 0] = q.x
+                rotations[i * 4 + 1] = q.y
+                rotations[i * 4 + 2] = q.z
+                rotations[i * 4 + 3] = q.w
             }
         }
 
@@ -174,6 +173,28 @@ extension SplatCloud {
         return out
     }
 
+    /// New cloud containing only the given splat indices (for spatial chunking).
+    /// Positions stay in original cloud space — chunk entities sit at identity
+    /// (Vitrine device-proven; per-chunk recentering is NOT needed).
+    func gathered(_ idx: [Int]) -> SplatCloud {
+        var out = SplatCloud(count: idx.count,
+                             positions: .init(repeating: 0, count: idx.count * 3),
+                             logScales: .init(repeating: 0, count: idx.count * 3),
+                             rotations: .init(repeating: 0, count: idx.count * 4),
+                             logitOpacities: .init(repeating: 0, count: idx.count),
+                             dc: .init(repeating: 0, count: idx.count * 3))
+        for (j, i) in idx.enumerated() {
+            for k in 0..<3 {
+                out.positions[j * 3 + k] = positions[i * 3 + k]
+                out.logScales[j * 3 + k] = logScales[i * 3 + k]
+                out.dc[j * 3 + k] = dc[i * 3 + k]
+            }
+            for k in 0..<4 { out.rotations[j * 4 + k] = rotations[i * 4 + k] }
+            out.logitOpacities[j] = logitOpacities[i]
+        }
+        return out
+    }
+
     /// Synthetic test cloud: a colorful spherical shell around the viewer.
     /// Decouples "does GaussianSplatComponent render in this sim" from "is the
     /// PLY parser right".
@@ -198,7 +219,7 @@ extension SplatCloud {
             cloud.positions[i * 3 + 1] = p.y
             cloud.positions[i * 3 + 2] = p.z
             for k in 0..<3 { cloud.logScales[i * 3 + k] = logScale }
-            cloud.rotations[i * 4 + 3] = 1 // identity (x,y,z,w)
+            cloud.rotations[i * 4 + 0] = 1 // identity, w-first (w,x,y,z)
             cloud.logitOpacities[i] = logitOpaque
             // Direction-keyed rainbow, encoded as SH DC: color = 0.2820948*dc + 0.5
             let c = SIMD3<Float>(0.5 + 0.5 * p.x / r, 0.5 + 0.5 * p.y / r, 0.5 + 0.5 * p.z / r)

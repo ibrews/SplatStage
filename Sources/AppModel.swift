@@ -26,6 +26,15 @@ final class AppModel {
     #else
     var debugDots: Bool = false
     #endif
+    /// Spatial-grid chunking — beta-1 workaround for whole-entity 3σ-bounds culling
+    /// (entity vanishes when the camera is within ~3× cloud radius of its center).
+    var chunked: Bool = true
+    /// Grid resolution per axis when chunked (g³ max cells).
+    var chunkGrid: Int = 4
+    /// 0 = .depth (zDepth), 1 = .distance (cameraDistance)
+    var sortMode: Int = 0
+    /// 0 = .perspective, 1 = .tangential
+    var projMode: Int = 0
 
     // Read-only status surfaced to the controls window.
     private(set) var fps: Double = 0
@@ -33,7 +42,9 @@ final class AppModel {
     var status: String = "Idle"
     var lastLoadSeconds: Double = 0
 
-    var reloadKey: String { "\(sceneChoice.rawValue)|\(splatCap)|\(debugDots)" }
+    var reloadKey: String {
+        "\(sceneChoice.rawValue)|\(splatCap)|\(debugDots)|\(chunked)|\(chunkGrid)|\(sortMode)|\(projMode)"
+    }
 
     private var emaFPS: Double = 0
     func tickFPS(deltaTime: TimeInterval) {
