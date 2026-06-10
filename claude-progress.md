@@ -1,5 +1,11 @@
 # SplatStage — progress
 
+## Current state (2026-06-10 evening, build 8 — ✅ WORKING ON DEVICE)
+- **Native splats render correctly on AVP**: synthetic shell + T&T Train confirmed by
+  Alex in headset. Chunked (4³), 256B-aligned buffers, w-first quats, sRGB colorSpace.
+- Chunking bypasses the ~200k per-resource limit — train loads at any cap.
+- Next: fps-vs-cap benchmark vs SplatDiorama baseline; f_rest SH >0; repo push decision.
+
 ## Current state (2026-06-10 overnight, v0.1 build 4)
 - DEVICE: native path renders GEOMETRY but no color — "passthrough material" look
   (shape only visible against a window). Build 4 = the authoritative config: raw 3DGS

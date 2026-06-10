@@ -1,6 +1,8 @@
 # SplatStage — needs Alex
 
-## ☀️ MORNING TEST (2026-06-10, build 4 already installed on AVP)
+## ~~☀️ MORNING TEST~~ ✅ DONE 2026-06-10 — splats working; benchmark is next
+
+## (was) MORNING TEST (2026-06-10, build 4 already installed on AVP)
 
 Two-step A/B, ~3 minutes, synthetic scene @ **100k cap**:
 

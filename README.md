@@ -25,14 +25,18 @@ the walk-*inside*, native-API counterpart and the A/B benchmark vehicle:
   color-bucketed unlit crossed-quads — always used in the simulator, and available on
   device via the "Debug dots" toggle. It's the A/B probe that separates "our data is
   wrong" from "the native resource config is wrong."
-- Raw 3DGS `.ply` values are uploaded unmodified; the renderer applies
-  `scaleActivation=.exponential` / `opacityActivation=.sigmoid` **and evaluates SH
-  internally** (`apple3dgs::ComputeColorFromSH` in AppleSplatRendering.framework) — so the
-  SH buffer wants raw `f_dc`, never pre-converted RGB. **Set `resource.colorSpace`
-  explicitly** (we use sRGB): the renderer's color→linear stage is gated on it.
-- ⚠️ Beta-1: `BufferResource.init` throws above ~200k splats — cap accordingly for now.
-- Open empirical questions (need device): quaternion component order (we upload
-  normalized x,y,z,w) and the f_rest_* SH layout above degree zero.
+- ✅ **Device-verified working** (2026-06-10): synthetic shell + Tanks-and-Temples Train
+  render correctly on AVP. The five load-bearing rules (full recipe in the KB technique
+  doc § "DEVICE-PROVEN RECIPE"):
+  1. Raw 3DGS values + `.exponential`/`.sigmoid` activations; raw `f_dc` SH (degree 0).
+  2. `resource.colorSpace = sRGB` — mandatory, else colorless "passthrough ghost."
+  3. Rotation buffer is **w-first** (`w,x,y,z` as in the PLY), normalized.
+  4. Buffer capacities padded to **256-byte multiples** (16-byte passes validation but
+     renders scrambled).
+  5. **Spatial-grid chunking** — beta-1 culls a whole entity once the camera is within
+     ~3× its bounding radius (3σ kernel support), so walk-inside scenes must be split
+     (4³ grid, runt cells folded). Bonus: also bypasses the ~200k per-resource limit.
+- Open empirical question: the `f_rest_*` SH layout above degree zero.
 
 ## Quickstart
 
