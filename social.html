@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SplatStage — Social Card</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060810;--teal:#00d4ff;--purple:#a78bfa;--amber:#f59e0b;
+  --text:#f0f4ff;--dim:rgba(240,244,255,.5);
+  --font:'Space Grotesk',system-ui,sans-serif;
+}
+html,body{width:1200px;height:630px;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font)}
+
+.bg{position:absolute;inset:0;overflow:hidden}
+.bg-gradient{position:absolute;inset:0;
+  background:radial-gradient(ellipse 80% 60% at 15% 50%,rgba(124,58,237,.22) 0%,transparent 55%),
+             radial-gradient(ellipse 60% 70% at 85% 20%,rgba(0,212,255,.16) 0%,transparent 55%),
+             linear-gradient(180deg,#060810 0%,#0b0820 50%,#060810 100%);
+}
+canvas{position:absolute;inset:0}
+
+/* Gaussian splat cloud on the right — soft anisotropic blobs */
+.splatcloud{position:absolute;top:50%;right:60px;transform:translateY(-50%);width:400px;height:400px;z-index:5}
+.splat{position:absolute;border-radius:50%;filter:blur(6px);mix-blend-mode:screen}
+.viewer{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:6;
+  width:10px;height:10px;border-radius:50%;
+  background:#fff;box-shadow:0 0 18px 4px rgba(255,255,255,.8)}
+.viewer-ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:6;
+  width:54px;height:54px;border-radius:50%;border:1.5px dashed rgba(255,255,255,.45)}
+
+.content{position:absolute;top:50%;left:80px;transform:translateY(-50%);max-width:680px;z-index:10}
+.tag{font-size:14px;font-weight:600;letter-spacing:.32em;text-transform:uppercase;
+  color:var(--teal);opacity:.9;margin-bottom:24px}
+.title{font-size:92px;font-weight:700;line-height:.96;letter-spacing:-.03em;
+  background:linear-gradient(130deg,#fff 20%,#a5d8ff 55%,#9b8cff 90%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  margin-bottom:18px}
+.tagline{font-size:23px;font-weight:400;color:var(--dim);line-height:1.45;
+  max-width:620px;margin-bottom:34px}
+.meta{display:flex;align-items:center;gap:14px;
+  font-size:13px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;
+  color:rgba(255,255,255,.45)}
+.meta .pill{display:inline-flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
+  border-radius:30px;padding:9px 18px}
+.meta .pill .lbl{opacity:.45;font-size:10px}
+.meta .url{color:var(--teal);opacity:.85}
+
+.footer{position:absolute;bottom:36px;left:80px;right:80px;
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:12px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;
+  color:rgba(255,255,255,.28);z-index:10}
+</style>
+</head>
+<body>
+<div class="bg">
+  <div class="bg-gradient"></div>
+  <canvas id="stars"></canvas>
+</div>
+
+<!-- Gaussian splat cloud: viewer dot standing INSIDE the splats -->
+<div class="splatcloud" id="cloud">
+  <div class="viewer-ring"></div>
+  <div class="viewer"></div>
+</div>
+
+<div class="content">
+  <div class="tag">visionOS 27 · Native RealityKit Splats</div>
+  <h1 class="title">SplatStage</h1>
+  <p class="tagline">Walk <em>inside</em> Gaussian-splat scenes on Apple Vision Pro — built on the native GaussianSplatComponent, with the device-proven beta-1 recipe.</p>
+  <div class="meta">
+    <div class="pill"><span class="lbl">Repo</span><span class="url">github.com/ibrews/SplatStage</span></div>
+  </div>
+</div>
+
+<div class="footer">
+  <span>Alex Coulombe · ibrews</span>
+  <span>Walk-Inside · Chunked · 2.7M Splats</span>
+</div>
+
+<script>
+// Stars background
+const cv=document.getElementById('stars'),sc=cv.getContext('2d');
+cv.width=1200;cv.height=630;
+const stars=Array.from({length:90},()=>({
+  x:Math.random()*1200,y:Math.random()*630,
+  r:Math.random()*1.4+.3,o:Math.random()*.5+.15
+}));
+sc.clearRect(0,0,1200,630);
+stars.forEach(s=>{
+  sc.beginPath();sc.arc(s.x,s.y,s.r,0,Math.PI*2);
+  sc.fillStyle=`rgba(210,225,255,${s.o})`;sc.fill();
+});
+
+// Splat shell: anisotropic gaussian blobs on a ring around the viewer dot,
+// direction-keyed colors like the app's synthetic scene.
+let seed=0x5EED;
+function rand(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
+const cloud=document.getElementById('cloud');
+for(let i=0;i<150;i++){
+  const a=rand()*Math.PI*2;
+  const rr=120+rand()*80;                       // shell band
+  const x=200+Math.cos(a)*rr, y=200+Math.sin(a)*rr*0.92;
+  const w=14+rand()*34, h=8+rand()*16;          // anisotropic
+  const hue=(a*180/Math.PI+rand()*40)%360;
+  const d=document.createElement('div');
+  d.className='splat';
+  d.style.cssText=`left:${x-w/2}px;top:${y-h/2}px;width:${w}px;height:${h}px;`+
+    `transform:rotate(${a*180/Math.PI+90+(rand()*40-20)}deg);`+
+    `background:radial-gradient(ellipse at center,hsla(${hue},85%,68%,.85) 0%,hsla(${hue},85%,60%,.25) 60%,transparent 100%)`;
+  cloud.appendChild(d);
+}
+</script>
+</body>
+</html>
