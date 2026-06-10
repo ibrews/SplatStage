@@ -1,0 +1,5 @@
+build/
+*.xcodeproj
+Resources/Splats/*.ply
+Resources/Splats/*.spz
+.DS_Store

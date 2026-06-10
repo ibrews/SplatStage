@@ -1,0 +1,29 @@
+name: SplatStage
+options:
+  bundleIdPrefix: com.ibrews
+  deploymentTarget:
+    visionOS: "27.0"
+  createIntermediateGroups: true
+
+targets:
+  SplatStage:
+    type: application
+    platform: visionOS
+    deploymentTarget: "27.0"
+    sources:
+      - path: Sources
+      # Splat data bundled as a folder reference (url(forResource:subdirectory:"Splats"))
+      - path: Resources/Splats
+        type: folder
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ibrews.SplatStage
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: SplatStage
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        DEVELOPMENT_TEAM: C624J4S2F8
+        CODE_SIGN_STYLE: Automatic
