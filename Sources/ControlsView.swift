@@ -44,6 +44,9 @@ struct ControlsView: View {
                         Text("2 π@Z").tag(2)
                         Text("3 -π/2@X").tag(3)
                     }
+                    #if !targetEnvironment(simulator)
+                    Toggle("Debug dots (fallback renderer)", isOn: $model.debugDots)
+                    #endif
                 }
                 Section("Telemetry") {
                     LabeledContent("Status", value: model.status)

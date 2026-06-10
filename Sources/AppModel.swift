@@ -18,6 +18,14 @@ final class AppModel {
     /// Up-axis calibration, same convention as SplatDiorama:
     /// 0 = identity, 1 = π about X (typical 3DGS y-down fix), 2 = π about Z, 3 = -π/2 about X
     var upMode: Int = 1
+    /// Render via FallbackDotsRenderer (unlit quads) instead of GaussianSplatComponent.
+    /// Forced on in the Simulator (native splat API is device-only in beta 1); on device
+    /// it's the A/B probe — dots OK + native invisible ⇒ resource config bug, not data.
+    #if targetEnvironment(simulator)
+    var debugDots: Bool = true
+    #else
+    var debugDots: Bool = false
+    #endif
 
     // Read-only status surfaced to the controls window.
     private(set) var fps: Double = 0
@@ -25,7 +33,7 @@ final class AppModel {
     var status: String = "Idle"
     var lastLoadSeconds: Double = 0
 
-    var reloadKey: String { "\(sceneChoice.rawValue)|\(splatCap)" }
+    var reloadKey: String { "\(sceneChoice.rawValue)|\(splatCap)|\(debugDots)" }
 
     private var emaFPS: Double = 0
     func tickFPS(deltaTime: TimeInterval) {

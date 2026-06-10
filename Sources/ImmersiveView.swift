@@ -35,6 +35,8 @@ struct ImmersiveView: View {
     private func rebuild() async {
         let choice = model.sceneChoice
         let cap = model.splatCap
+        stageLog.error("STAGE_BEGIN scene=\(choice.rawValue, privacy: .public) cap=\(cap)")
+        print("[SplatStage] STAGE_BEGIN scene=\(choice.rawValue) cap=\(cap)")
         model.status = "Loading \(choice.rawValue)…"
         let t0 = Date()
         do {
@@ -56,28 +58,32 @@ struct ImmersiveView: View {
                 }.value
             }
             guard choice == model.sceneChoice, cap == model.splatCap else { return } // stale
+            let entity: Entity
+            var mode = "dots"
             #if targetEnvironment(simulator)
-            // Beta-1: no GaussianSplat API in the sim SDK. Parse/prune still runs
-            // (validates the loader + telemetry); rendering needs the device.
-            root.children.forEach { $0.removeFromParent() }
-            model.loadedCount = cloud.count
-            model.lastLoadSeconds = Date().timeIntervalSince(t0)
-            model.status = "Parsed OK — native splat render is DEVICE-ONLY in visionOS 27 beta 1"
-            stageLog.info("STAGE_RESULT sim-stub scene=\(choice.rawValue, privacy: .public) splats=\(cloud.count) loadSeconds=\(String(format: "%.2f", Date().timeIntervalSince(t0)), privacy: .public)")
+            // Beta-1: no GaussianSplat API in the sim SDK — fallback is the only renderer.
+            entity = FallbackDotsRenderer.makeEntity(from: cloud)
             #else
-            let resource = try SplatResourceBuilder.makeResource(from: cloud)
-            let entity = Entity()
-            entity.components.set(GaussianSplatComponent(resource))
+            if model.debugDots {
+                entity = FallbackDotsRenderer.makeEntity(from: cloud)
+            } else {
+                let resource = try SplatResourceBuilder.makeResource(from: cloud)
+                entity = Entity()
+                entity.components.set(GaussianSplatComponent(resource))
+                mode = "native"
+            }
+            #endif
             root.children.forEach { $0.removeFromParent() }
             root.addChild(entity)
             model.loadedCount = cloud.count
             model.lastLoadSeconds = Date().timeIntervalSince(t0)
-            model.status = "Live"
-            stageLog.info("STAGE_RESULT native scene=\(choice.rawValue, privacy: .public) splats=\(cloud.count) loadSeconds=\(String(format: "%.2f", Date().timeIntervalSince(t0)), privacy: .public)")
-            #endif
+            model.status = "Live (\(mode))"
+            stageLog.error("STAGE_RESULT \(mode, privacy: .public) scene=\(choice.rawValue, privacy: .public) splats=\(cloud.count) loadSeconds=\(String(format: "%.2f", Date().timeIntervalSince(t0)), privacy: .public)")
+            print("[SplatStage] STAGE_RESULT \(mode) scene=\(choice.rawValue) splats=\(cloud.count) loadSeconds=\(String(format: "%.2f", Date().timeIntervalSince(t0)))")
         } catch {
             model.status = "Error: \(error)"
             stageLog.error("STAGE_RESULT error=\(String(describing: error), privacy: .public)")
+            print("[SplatStage] STAGE_RESULT error=\(error)")
         }
     }
 }

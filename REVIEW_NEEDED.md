@@ -1,5 +1,22 @@
 # SplatStage — needs Alex
 
+## ☀️ MORNING TEST (2026-06-10, build 4 already installed on AVP)
+
+Two-step A/B, ~3 minutes, synthetic scene @ **100k cap**:
+
+1. **Dots first:** Controls → Placement → turn ON "Debug dots (fallback renderer)" →
+   Enter Stage. You should see a colored gradient wall of small squares all around you
+   (sim-verified tonight, screenshot in /tmp/splatstage_sim_synthetic.png).
+   - If YES → parser/colors/transform are all good; any native problem is resource config.
+   - If NO → something device-side is wrong beyond the splat API; tell me what you see.
+2. **Native:** toggle dots OFF (stage rebuilds automatically). Build 4 adds the missing
+   `colorSpace = sRGB` (renderer binary gates its color stage on it) and returns to raw
+   values + real .exponential/.sigmoid activations.
+   - Colored shell → FIXED, I'll benchmark and write it up.
+   - Still passthrough-ghost → report; next probes are queued (opacity float4 stride,
+     premultiplied DC, .perspective projection, sortingMode).
+
+
 1. **Install visionOS 27 beta 1 on your Vision Pro?** The native splat renderer is
    device-only in beta 1 (sim SDK lacks the API entirely). Everything is staged for the
    moment the device is on 27: `xcodegen generate && build for device && install`.

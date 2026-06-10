@@ -16,15 +16,23 @@ the walk-*inside*, native-API counterpart and the A/B benchmark vehicle:
 
 ## Status / known beta-1 gaps
 
-- ✅ App builds for visionOS 27 **simulator** (stub) and **device** (full native path).
+- ✅ App builds for visionOS 27 **simulator** (fallback renderer) and **device** (native path).
 - ⚠️ **`GaussianSplatResource`/`GaussianSplatComponent` are DEVICE-ONLY in beta 1** —
-  the simulator SDK contains zero GaussianSplat symbols in any framework. The sim build
-  parses/prunes and reports telemetry but cannot render splats natively.
+  zero GaussianSplat symbols in the simulator, macOS 27, and iOS 27 SDKs (macOS 27's
+  runtime carries only an unbindable internal `_proto_SplatComponent`). Verified by
+  SDK swiftinterface sweeps + dyld export dumps.
+- 🟦 **Fallback dots renderer** (`FallbackDotsRenderer`): the same `SplatCloud` drawn as
+  color-bucketed unlit crossed-quads — always used in the simulator, and available on
+  device via the "Debug dots" toggle. It's the A/B probe that separates "our data is
+  wrong" from "the native resource config is wrong."
 - Raw 3DGS `.ply` values are uploaded unmodified; the renderer applies
-  `scaleActivation=.exponential` and `opacityActivation=.sigmoid`.
+  `scaleActivation=.exponential` / `opacityActivation=.sigmoid` **and evaluates SH
+  internally** (`apple3dgs::ComputeColorFromSH` in AppleSplatRendering.framework) — so the
+  SH buffer wants raw `f_dc`, never pre-converted RGB. **Set `resource.colorSpace`
+  explicitly** (we use sRGB): the renderer's color→linear stage is gated on it.
+- ⚠️ Beta-1: `BufferResource.init` throws above ~200k splats — cap accordingly for now.
 - Open empirical questions (need device): quaternion component order (we upload
-  normalized x,y,z,w), SH DC color convention (0.2820948·dc+0.5 assumed), and whether
-  `bytesUsed`/`withUnsafeMutableBytes` is the correct LowLevelBuffer fill for static data.
+  normalized x,y,z,w) and the f_rest_* SH layout above degree zero.
 
 ## Quickstart
 
@@ -47,6 +55,8 @@ into `Resources/Splats/` (gitignored; `entire-train.ply` — 2.7M splats — is 
 2. **Synthetic shell:** pick "Synthetic shell" in the controls — a rainbow splat sphere
    around the viewer; first thing to look at on device (validates API + color convention
    with zero parser risk).
+   **In the simulator** this renders via the fallback dots automatically — you should see
+   a direction-keyed color gradient surrounding the camera.
 3. **Walk the train:** on a visionOS 27 device, scene "Train (2.7M)", cap 400k → 2.7M,
    and watch the FPS readout — this is the MetalSplatter-vs-native benchmark.
 4. **Up-axis calibration:** if the scene is sideways/upside-down, cycle "Up axis"

@@ -1,5 +1,17 @@
 # SplatStage — progress
 
+## Current state (2026-06-10 overnight, v0.1 build 4)
+- DEVICE: native path renders GEOMETRY but no color — "passthrough material" look
+  (shape only visible against a window). Build 4 = the authoritative config: raw 3DGS
+  values + .exponential/.sigmoid + raw f_dc + **explicit colorSpace = sRGB** (was never
+  set before; renderer binary shows the color stage is gated on it). NOT yet user-verified.
+- NEW: **FallbackDotsRenderer** — color-bucketed unlit crossed-quads, no GaussianSplat
+  API. Always-on in sim; device toggle "Debug dots" in Controls → Placement.
+- SIM VERIFIED (screenshots): synthetic shell = direction-keyed color gradient ✓;
+  train PLY = sky blues + warm train speckle, parse/recenter/colors all sane ✓.
+- Morning A/B on device: dots ON = colored scene? then data is good and any remaining
+  native failure is GaussianSplatResource config. Dots OFF = test build-4 colorSpace fix.
+
 ## Current state (2026-06-09, v0.1 build 1)
 - Scaffolded day-after-WWDC26. visionOS 27 only.
 - Sim build ✅ (stubbed render), device-SDK compile ✅ (full native GaussianSplat path).
@@ -15,6 +27,20 @@
 - Immersion: .mixed (proven path; splat surround occludes passthrough on its own).
 
 ## Failed approaches / gotchas
+- **Build 2 misdiagnosis: "beta-1 ignores activation properties" was WRONG.** Pre-applying
+  exp/sigmoid on CPU + .identity (build 2) and pre-converting DC→RGB into the SH buffer
+  (build 3) both still rendered as colorless "passthrough." Ground truth came from
+  demangling /System/Library/PrivateFrameworks/AppleSplatRendering.framework symbols:
+  `apple3dgs::TransformGaussians(…ActivationType…)` and `apple3dgs::ComputeColorFromSH(…)`
+  exist — the renderer DOES apply activations and DOES evaluate SH internally (wants raw
+  f_dc). The color stage linearizes via `GetColorPropertiesFromCGColorSpace(colorSpace)` →
+  `ToLinearColorSpace` — the missing piece was never setting `resource.colorSpace`.
+  Key reasoning: zero SH would render mid-gray (0.5), not transparent ⇒ "passthrough" =
+  near-zero ALPHA ⇒ opacity/colorSpace stage, not a DC-value convention problem.
+- **Native splat render is impossible OFF-device in beta 1, fully verified:** sim SDK 0
+  symbols, macOS 27 SDK 0 symbols, iOS 27 SDK 0 symbols; macOS 27.0 runtime (this MBP!)
+  exports only an internal `_proto_SplatComponent` (ABI-only, in no swiftinterface — not
+  practically bindable). Hence FallbackDotsRenderer for sim verification.
 - **Simulator SDK has NO GaussianSplat symbols (beta 1)** — first build failed
   "cannot find type"; the API is device-SDK only. Confirmed by sweeping every
   framework swiftinterface in XRSimulator27.0.sdk. → #if targetEnvironment(simulator)
