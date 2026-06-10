@@ -64,23 +64,64 @@ struct ControlsView: View {
                     LabeledContent("Load time", value: String(format: "%.1f s", model.lastLoadSeconds))
                     LabeledContent("FPS (EMA)", value: String(format: "%.0f", model.fps))
                 }
+                Section("Benchmark") {
+                    Button(model.benchRunning ? "Sweeping… keep looking around" : "Run cap sweep (fps vs splats)") {
+                        Task { await runBenchmark() }
+                    }
+                    .disabled(model.benchRunning || !spaceOpen)
+                    if !model.benchLog.isEmpty {
+                        Text(model.benchLog)
+                            .font(.system(.footnote, design: .monospaced))
+                            .textSelection(.enabled)
+                    }
+                }
             }
             .navigationTitle("SplatStage v0.1")
         }
-        .task {
-            // Headless verification hook (same pattern as SplatDiorama):
-            // SIMCTL_CHILD_AUTO_ENTER=1 opens the stage without a spatial tap.
-            if ProcessInfo.processInfo.environment["AUTO_ENTER"] == "1", !spaceOpen {
-                if let scene = ProcessInfo.processInfo.environment["AUTO_SCENE"],
-                   let choice = AppModel.SceneChoice.allCases.first(where: { $0.rawValue.hasPrefix(scene) }) {
-                    model.sceneChoice = choice
-                }
-                if let capStr = ProcessInfo.processInfo.environment["AUTO_CAP"], let cap = Int(capStr) {
-                    model.splatCap = cap
-                }
-                let result = await openImmersiveSpace(id: "stage")
-                spaceOpen = (result == .opened)
+        .task { await autoEnterIfRequested() }
+    }
+
+    /// Steps the splat cap through the benchmark ladder, letting each load settle,
+    /// then samples the EMA fps. Results land in the Benchmark section and in the
+    /// console as STAGE_BENCH lines (devicectl --console captures them).
+    @MainActor
+    private func runBenchmark() async {
+        let ladder = [100_000, 200_000, 400_000, 800_000, 1_600_000, 2_700_000]
+        model.benchRunning = true
+        model.benchLog = "scene: \(model.sceneChoice.rawValue)\n"
+        defer { model.benchRunning = false }
+        for cap in ladder {
+            model.splatCap = cap                       // triggers .task(id:) rebuild
+            // wait for the load to finish (status leaves "Loading…"), max 90 s
+            for _ in 0..<180 {
+                try? await Task.sleep(for: .milliseconds(500))
+                if model.status.hasPrefix("Live") || model.status.hasPrefix("Error") { break }
             }
+            guard model.status.hasPrefix("Live") else {
+                model.benchLog += "\(cap / 1000)k: LOAD FAILED — \(model.status)\n"
+                continue
+            }
+            try? await Task.sleep(for: .seconds(10))   // settle: sort, EMA converge
+            let line = "\(cap / 1000)k: \(Int(model.fps.rounded())) fps (loaded \(model.loadedCount), \(String(format: "%.1f", model.lastLoadSeconds))s)"
+            model.benchLog += line + "\n"
+            print("[SplatStage] STAGE_BENCH \(line)")
         }
+        model.benchLog += "done."
+    }
+
+    /// Headless verification hook (same pattern as SplatDiorama):
+    /// SIMCTL_CHILD_AUTO_ENTER=1 opens the stage without a spatial tap.
+    @MainActor
+    private func autoEnterIfRequested() async {
+        guard ProcessInfo.processInfo.environment["AUTO_ENTER"] == "1", !spaceOpen else { return }
+        if let scene = ProcessInfo.processInfo.environment["AUTO_SCENE"],
+           let choice = AppModel.SceneChoice.allCases.first(where: { $0.rawValue.hasPrefix(scene) }) {
+            model.sceneChoice = choice
+        }
+        if let capStr = ProcessInfo.processInfo.environment["AUTO_CAP"], let cap = Int(capStr) {
+            model.splatCap = cap
+        }
+        let result = await openImmersiveSpace(id: "stage")
+        spaceOpen = (result == .opened)
     }
 }

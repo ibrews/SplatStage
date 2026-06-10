@@ -42,6 +42,10 @@ final class AppModel {
     var status: String = "Idle"
     var lastLoadSeconds: Double = 0
 
+    // Benchmark sweep (fps vs cap — the SplatDiorama/MetalSplatter A/B).
+    var benchRunning = false
+    var benchLog = ""
+
     var reloadKey: String {
         "\(sceneChoice.rawValue)|\(splatCap)|\(debugDots)|\(chunked)|\(chunkGrid)|\(sortMode)|\(projMode)"
     }
