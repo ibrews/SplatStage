@@ -68,6 +68,20 @@ into `Resources/Splats/` (gitignored; `entire-train.ply` — 2.7M splats — is 
 5. **Importance pruning:** drop the cap to 100k and note which splats survive —
    highest opacity×scale first (same pruning insight as SplatDiorama).
 
+## Tests
+
+`SplatStageTests/` covers the pure parse/transform logic in `SplatPLY.swift` — binary-PLY
+parsing + the three error cases (`notBinaryLittleEndian` / `missingField` / `truncated`),
+median recenter, importance pruning, and the synthetic cloud (7 `@Test` cases, Swift Testing).
+
+```bash
+xcodegen generate
+xcodebuild test -project SplatStage.xcodeproj -scheme SplatStage \
+  -destination 'platform=visionOS Simulator,name=Apple Vision Pro,OS=27.0'
+```
+
+The suite is pure logic (Foundation + simd only) — no device or rendering needed.
+
 ## Credits
 
 Built by Alex Coulombe ([ibrews](https://github.com/ibrews)). Native splat API surface
