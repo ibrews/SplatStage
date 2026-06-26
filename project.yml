@@ -27,3 +27,33 @@ targets:
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         DEVELOPMENT_TEAM: C624J4S2F8
         CODE_SIGN_STYLE: Automatic
+
+  SplatStageTests:
+    type: bundle.unit-test
+    platform: visionOS
+    deploymentTarget: "27.0"
+    sources:
+      - path: SplatStageTests
+    dependencies:
+      - target: SplatStage
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ibrews.SplatStage.tests
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGNING_ALLOWED: NO
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/SplatStage.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SplatStage
+        BUNDLE_LOADER: $(TEST_HOST)
+
+schemes:
+  SplatStage:
+    build:
+      targets:
+        SplatStage: all
+        SplatStageTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - SplatStageTests
