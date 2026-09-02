@@ -84,7 +84,7 @@ The suite is pure logic (Foundation + simd only) — no device or rendering need
 
 ## Credits
 
-Built by Alex Coulombe ([ibrews](https://github.com/ibrews)). Native splat API surface
+Built by Alex Coulombe Presents ([ibrews](https://github.com/ibrews)). Native splat API surface
 documented in the Agile Lens KB: `intelligence/techniques/realitykit-gaussian-splat-api-visionos27.md`.
 
 ## Support
